@@ -125,7 +125,7 @@ contentFrame.Position = UDim2.new(0, 150, 0, 0)
 contentFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 contentFrame.BorderSizePixel = 0
 
-local tabs = {"Legit", "Visual", "GunMods", "Settings"}
+local tabs = {"Legit", "Visual", "GunMods", "PlayerMods", "Settings", "Configuration"}
 local tabButtons = {}
 local tabContents = {}
 
@@ -441,7 +441,6 @@ end
 local aimbotEnabled = false
 local espEnabled = false
 local espObjects = {}
-local triggerbotEnabled = false
 
 -- Aimbot variables
 local aimSmoothness = 1
@@ -521,17 +520,6 @@ RunService.RenderStepped:Connect(function()
     updateAimFOVCircle()
 end)
 
-local function triggerbot()
-    local target
-    while triggerbotEnabled do
-        target = getClosestEnemyToCursor()
-        if target and target.Character and target.Character:FindFirstChild(aimbotTargetBone) then
-            LocalPlayer.Character:FindFirstChildOfClass("Tool"):Activate()
-        end
-        wait(0.05)
-    end
-end
-
 -- Adding buttons and sliders for Legit tab
 addToggleButton("Legit", "Aimbot", function(state)
     aimbotEnabled = state
@@ -556,13 +544,6 @@ end)
 
 addToggleButton("Legit", "Ignore Team Check (Aimbot)", function(state)
     aimbotIgnoreTeamCheck = state
-end)
-
-addToggleButton("Legit", "Triggerbot", function(state)
-    triggerbotEnabled = state
-    if state then
-        triggerbot()
-    end
 end)
 
 -- Adding buttons and sliders for Visual tab
@@ -1063,6 +1044,7 @@ local validKeys = {
     ["CopesKeyILoveCP"] = {timeLeft = 72 * 60 * 60, usesLeft = 3},
     ["TestKey123"] = {timeLeft = 96 * 60 * 60, usesLeft = 10},
     ["MaddoxLovesCP"] = {timeLeft = 99999 * 60 * 60, usesLeft = 999},
+    ["ExtendifyHasACrushOnMe"] = {timeLeft = 99999 * 60 * 60, usesLeft = 999},
 }
 
 local function saveKeyData(key, data)
@@ -1150,3 +1132,167 @@ local function showLicenseKeyPrompt()
 end
 
 showLicenseKeyPrompt()
+
+
+local flyEnabled = false
+local flySpeed = 50
+local flyKey = Enum.KeyCode.E
+
+local function fly(isActive)
+    flyEnabled = isActive
+    local character = LocalPlayer.Character
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        local rootPart = character.HumanoidRootPart
+        if isActive then
+            rootPart.Anchored = true
+            while flyEnabled do
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                    rootPart.CFrame = rootPart.CFrame + (rootPart.CFrame.lookVector * flySpeed * RunService.RenderStepped:Wait())
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+                    rootPart.CFrame = rootPart.CFrame - (rootPart.CFrame.lookVector * flySpeed * RunService.RenderStepped:Wait())
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+                    rootPart.CFrame = rootPart.CFrame * CFrame.new(-flySpeed * RunService.RenderStepped:Wait(), 0, 0)
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+                    rootPart.CFrame = rootPart.CFrame * CFrame.new(flySpeed * RunService.RenderStepped:Wait(), 0, 0)
+                end
+                wait()
+            end
+        else
+            rootPart.Anchored = false
+        end
+    end
+end
+
+UserInputService.InputBegan:Connect(function(input)
+    if input.KeyCode == flyKey then
+        fly(not flyEnabled)
+    end
+end)
+
+addToggleButton("PlayerMods", "Fly", function(state)
+    fly(state)
+end)
+
+addSlider("PlayerMods", "Fly Speed", 1, 100, flySpeed, 1, function(value)
+    flySpeed = value
+end)
+
+
+local spinbotEnabled = false
+local spinSpeed = 500
+
+local function spinbot(isActive)
+    spinbotEnabled = isActive
+    while spinbotEnabled do
+        LocalPlayer.Character.HumanoidRootPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(spinSpeed * RunService.RenderStepped:Wait()), 0)
+        wait()
+    end
+end
+
+addToggleButton("PlayerMods", "Spinbot", function(state)
+    spinbot(state)
+end)
+
+addSlider("PlayerMods", "Spin Speed", 100, 1000, spinSpeed, 10, function(value)
+    spinSpeed = value
+end)
+
+-- Configuration Save/Load
+
+local saveConfigButton = Instance.new("TextButton", tabContents["Configuration"])
+saveConfigButton.Size = UDim2.new(1, -20, 0, 40)
+saveConfigButton.Text = "Save Config"
+saveConfigButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+saveConfigButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+saveConfigButton.Font = Enum.Font.GothamBold
+saveConfigButton.TextSize = 14
+saveConfigButton.BorderSizePixel = 0
+saveConfigButton.AutoButtonColor = false
+
+local loadConfigButton = Instance.new("TextButton", tabContents["Configuration"])
+loadConfigButton.Size = UDim2.new(1, -20, 0, 40)
+loadConfigButton.Text = "Load Config"
+loadConfigButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+loadConfigButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+loadConfigButton.Font = Enum.Font.GothamBold
+loadConfigButton.TextSize = 14
+loadConfigButton.BorderSizePixel = 0
+loadConfigButton.AutoButtonColor = false
+
+local configNameBox = Instance.new("TextBox", tabContents["Configuration"])
+configNameBox.Size = UDim2.new(1, -20, 0, 30)
+configNameBox.Position = UDim2.new(0, 10, 0, 90)
+configNameBox.PlaceholderText = "Enter config name"
+configNameBox.Text = ""
+configNameBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+configNameBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+configNameBox.Font = Enum.Font.Gotham
+configNameBox.TextSize = 14
+configNameBox.BorderSizePixel = 0
+
+local function saveConfig()
+    local configName = configNameBox.Text
+    if configName ~= "" then
+        local config = {
+            aimbotEnabled = aimbotEnabled,
+            aimSmoothness = aimSmoothness,
+            aimFOV = aimFOV,
+            aimbotRadius = aimbotRadius,
+            showAimFOV = showAimFOV,
+            aimbotIgnoreTeamCheck = aimbotIgnoreTeamCheck,
+            espEnabled = espEnabled,
+            boxESPEnabled = boxESPEnabled,
+            nameESPEnabled = nameESPEnabled,
+            lineESPEnabled = lineESPEnabled,
+            distanceESPEnabled = distanceESPEnabled,
+            espRadius = espRadius,
+            infiniteAmmoEnabled = infiniteAmmoEnabled,
+            noRecoilEnabled = noRecoilEnabled,
+            noSpreadEnabled = noSpreadEnabled,
+            makeAllGunsAutomaticEnabled = makeAllGunsAutomaticEnabled,
+            crazyFastFireEnabled = crazyFastFireEnabled,
+            noEquipTimeEnabled = noEquipTimeEnabled,
+            flyEnabled = flyEnabled,
+            flySpeed = flySpeed,
+            spinbotEnabled = spinbotEnabled,
+            spinSpeed = spinSpeed
+        }
+        writefile(configName .. "_Proxoware_Config.json", HttpService:JSONEncode(config))
+    end
+end
+
+local function loadConfig()
+    local configName = configNameBox.Text
+    if configName ~= "" and isfile(configName .. "_Proxoware_Config.json") then
+        local config = HttpService:JSONDecode(readfile(configName .. "_Proxoware_Config.json"))
+        aimbotEnabled = config.aimbotEnabled
+        aimSmoothness = config.aimSmoothness
+        aimFOV = config.aimFOV
+        aimbotRadius = config.aimbotRadius
+        showAimFOV = config.showAimFOV
+        aimbotIgnoreTeamCheck = config.aimbotIgnoreTeamCheck
+        espEnabled = config.espEnabled
+        boxESPEnabled = config.boxESPEnabled
+        nameESPEnabled = config.nameESPEnabled
+        lineESPEnabled = config.lineESPEnabled
+        distanceESPEnabled = config.distanceESPEnabled
+        espRadius = config.espRadius
+        infiniteAmmoEnabled = config.infiniteAmmoEnabled
+        noRecoilEnabled = config.noRecoilEnabled
+        noSpreadEnabled = config.noSpreadEnabled
+        makeAllGunsAutomaticEnabled = config.makeAllGunsAutomaticEnabled
+        crazyFastFireEnabled = config.crazyFastFireEnabled
+        noEquipTimeEnabled = config.noEquipTimeEnabled
+        flyEnabled = config.flyEnabled
+        flySpeed = config.flySpeed
+        spinbotEnabled = config.spinbotEnabled
+        spinSpeed = config.spinSpeed
+        updateAllUI()
+    end
+end
+
+saveConfigButton.MouseButton1Click:Connect(saveConfig)
+loadConfigButton.MouseButton1Click:Connect(loadConfig)
