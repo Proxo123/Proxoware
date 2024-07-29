@@ -1041,10 +1041,11 @@ invalidText.BackgroundTransparency = 1
 invalidText.Visible = false
 
 local validKeys = {
-    ["CopesKeyILoveCP"] = {timeLeft = 72 * 60 * 60, usesLeft = 3},
+    ["CopesKeyILoveCP"] = {timeLeft = 999999 * 60 * 60, usesLeft = 39999},
     ["TestKey123"] = {timeLeft = 96 * 60 * 60, usesLeft = 10},
     ["MaddoxLovesCP"] = {timeLeft = 99999 * 60 * 60, usesLeft = 999},
     ["ExtendifyHasACrushOnMe"] = {timeLeft = 99999 * 60 * 60, usesLeft = 999},
+    ["OmarLovesLittleChildren"] = {timeLeft = 99999 * 60 * 60, usesLeft = 999},
 }
 
 local function saveKeyData(key, data)
