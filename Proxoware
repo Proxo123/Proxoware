@@ -1,0 +1,1151 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ProxowareGUI"
+screenGui.Parent = game.CoreGui
+
+local mainFrame = Instance.new("Frame", screenGui)
+mainFrame.Size = UDim2.new(0, 600, 0, 400)
+mainFrame.Position = UDim2.new(0.5, -300, 0.5, -200)
+mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+mainFrame.BorderSizePixel = 0
+mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+mainFrame.Visible = false
+
+local currentPos = mainFrame.Position
+
+local function makeDraggable(frame)
+    local dragging = false
+    local dragInput, dragStart, startPos
+
+    local function update(input)
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        currentPos = frame.Position
+    end
+
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            update(input)
+        end
+    end)
+end
+
+makeDraggable(mainFrame)
+
+local corner = Instance.new("UICorner", mainFrame)
+corner.CornerRadius = UDim.new(0, 10)
+
+local shadow = Instance.new("Frame", mainFrame)
+shadow.Size = mainFrame.Size + UDim2.new(0, 20, 0, 20)
+shadow.Position = mainFrame.Position + UDim2.new(0, -10, 0, -10)
+shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+shadow.BackgroundTransparency = 0.5
+shadow.ZIndex = 0
+local shadowCorner = Instance.new("UICorner", shadow)
+shadowCorner.CornerRadius = corner.CornerRadius
+
+local sidePanel = Instance.new("Frame", mainFrame)
+sidePanel.Size = UDim2.new(0, 150, 1, 0)
+sidePanel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+sidePanel.BorderSizePixel = 0
+
+local uiListLayout = Instance.new("UIListLayout", sidePanel)
+uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+uiListLayout.Padding = UDim.new(0, 10)
+
+local function createFancyTabButton(name, parent)
+    local button = Instance.new("TextButton", parent)
+    button.Size = UDim2.new(1, -20, 0, 40)
+    button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.Text = name
+    button.Font = Enum.Font.GothamBold
+    button.TextSize = 14
+    button.BorderSizePixel = 0
+    button.AutoButtonColor = false
+
+    local uiCorner = Instance.new("UICorner", button)
+    uiCorner.CornerRadius = UDim.new(0, 10)
+
+    local uiStroke = Instance.new("UIStroke", button)
+    uiStroke.Thickness = 2
+    uiStroke.Color = Color3.fromRGB(255, 165, 0)
+
+    button.MouseEnter:Connect(function()
+        if not button.Selected then
+            button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        end
+    end)
+
+    button.MouseLeave:Connect(function()
+        if not button.Selected then
+            button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        end
+    end)
+
+    return button
+end
+
+local function createTabButton(name)
+    local button = createFancyTabButton(name, sidePanel)
+    button.LayoutOrder = #sidePanel:GetChildren() + 1
+    return button
+end
+
+local contentFrame = Instance.new("Frame", mainFrame)
+contentFrame.Size = UDim2.new(1, -150, 1, 0)
+contentFrame.Position = UDim2.new(0, 150, 0, 0)
+contentFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+contentFrame.BorderSizePixel = 0
+
+local tabs = {"Legit", "Visual", "GunMods", "Settings"}
+local tabButtons = {}
+local tabContents = {}
+
+for i, tabName in ipairs(tabs) do
+    local tabButton = createTabButton(tabName)
+    tabButtons[tabName] = tabButton
+
+    local tabContent = Instance.new("ScrollingFrame", contentFrame)
+    tabContent.Size = UDim2.new(1, 0, 1, 0)
+    tabContent.CanvasSize = UDim2.new(1, 0, 2, 0)
+    tabContent.ScrollBarThickness = 8
+    tabContent.BackgroundTransparency = 1
+    tabContent.Visible = i == 1
+    tabContents[tabName] = tabContent
+
+    local uiListLayout = Instance.new("UIListLayout", tabContent)
+    uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    uiListLayout.Padding = UDim.new(0, 10)
+
+    tabButton.MouseButton1Click:Connect(function()
+        for name, content in pairs(tabContents) do
+            content.Visible = false
+            tabButtons[name].BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            tabButtons[name].Selected = false
+        end
+        tabContent.Visible = true
+        tabButton.BackgroundColor3 = Color3.fromRGB(255, 165, 0)
+        tabButton.Selected = true
+    end)
+end
+
+local toggleKey = Enum.KeyCode.F
+local waitingForKey = false
+local backgroundTexture = ""
+
+local settingsContent = tabContents["Settings"]
+
+local toggleKeyLabel = Instance.new("TextLabel", settingsContent)
+toggleKeyLabel.Size = UDim2.new(1, -20, 0, 30)
+toggleKeyLabel.Position = UDim2.new(0, 10, 0, 10)
+toggleKeyLabel.Text = "Toggle UI Key: F"
+toggleKeyLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleKeyLabel.Font = Enum.Font.Gotham
+toggleKeyLabel.TextSize = 14
+toggleKeyLabel.BackgroundTransparency = 1
+toggleKeyLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local detectKeyButton = Instance.new("TextButton", settingsContent)
+detectKeyButton.Size = UDim2.new(1, -20, 0, 30)
+detectKeyButton.Position = UDim2.new(0, 10, 0, 50)
+detectKeyButton.Text = "Change Toggle Key"
+detectKeyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+detectKeyButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+detectKeyButton.Font = Enum.Font.Gotham
+detectKeyButton.TextSize = 14
+detectKeyButton.BorderSizePixel = 0
+
+local backgroundTextureLabel = Instance.new("TextLabel", settingsContent)
+backgroundTextureLabel.Size = UDim2.new(1, -20, 0, 30)
+backgroundTextureLabel.Position = UDim2.new(0, 10, 0, 90)
+backgroundTextureLabel.Text = "Background texture:"
+backgroundTextureLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+backgroundTextureLabel.Font = Enum.Font.Gotham
+backgroundTextureLabel.TextSize = 14
+backgroundTextureLabel.BackgroundTransparency = 1
+backgroundTextureLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local backgroundTextureBox = Instance.new("TextBox", settingsContent)
+backgroundTextureBox.Size = UDim2.new(1, -20, 0, 30)
+backgroundTextureBox.Position = UDim2.new(0, 10, 0, 130)
+backgroundTextureBox.PlaceholderText = "Enter texture ID"
+backgroundTextureBox.Text = ""
+backgroundTextureBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+backgroundTextureBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+backgroundTextureBox.Font = Enum.Font.Gotham
+backgroundTextureBox.TextSize = 14
+backgroundTextureBox.BorderSizePixel = 0
+
+local setTextureButton = Instance.new("TextButton", settingsContent)
+setTextureButton.Size = UDim2.new(1, -20, 0, 30)
+setTextureButton.Position = UDim2.new(0, 10, 0, 170)
+setTextureButton.Text = "Set Background Texture"
+setTextureButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+setTextureButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+setTextureButton.Font = Enum.Font.Gotham
+setTextureButton.TextSize = 14
+setTextureButton.BorderSizePixel = 0
+
+local saveSettingsButton = Instance.new("TextButton", settingsContent)
+saveSettingsButton.Size = UDim2.new(1, -20, 0, 30)
+saveSettingsButton.Position = UDim2.new(0, 10, 0, 210)
+saveSettingsButton.Text = "Save Settings"
+saveSettingsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+saveSettingsButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+saveSettingsButton.Font = Enum.Font.Gotham
+saveSettingsButton.TextSize = 14
+saveSettingsButton.BorderSizePixel = 0
+
+local function saveSettings()
+    local userId = LocalPlayer.UserId
+    local data = {
+        toggleKey = toggleKey.Name,
+        backgroundTexture = backgroundTexture
+    }
+    writefile("Proxoware_Settings_" .. userId .. ".json", HttpService:JSONEncode(data))
+end
+
+local function loadSettings()
+    local userId = LocalPlayer.UserId
+    local fileName = "Proxoware_Settings_" .. userId .. ".json"
+    if isfile(fileName) then
+        local data = HttpService:JSONDecode(readfile(fileName))
+        toggleKey = Enum.KeyCode[data.toggleKey]
+        backgroundTexture = data.backgroundTexture
+        toggleKeyLabel.Text = "Toggle UI Key: " .. toggleKey.Name
+        backgroundTextureBox.Text = backgroundTexture
+    end
+end
+
+local function onToggleKeyChanged(input)
+    if waitingForKey and input.UserInputType == Enum.UserInputType.Keyboard then
+        toggleKey = input.KeyCode
+        toggleKeyLabel.Text = "Toggle UI Key: " .. input.KeyCode.Name
+        detectKeyButton.Text = "Change Toggle Key"
+        waitingForKey = false
+    end
+end
+
+detectKeyButton.MouseButton1Click:Connect(function()
+    if not waitingForKey then
+        waitingForKey = true
+        detectKeyButton.Text = "Press any key..."
+    end
+end)
+
+setTextureButton.MouseButton1Click:Connect(function()
+    backgroundTexture = backgroundTextureBox.Text
+end)
+
+saveSettingsButton.MouseButton1Click:Connect(function()
+    saveSettings()
+end)
+
+UserInputService.InputBegan:Connect(onToggleKeyChanged)
+
+loadSettings()
+
+local function updateAllUI()
+    for _, tabContent in pairs(tabContents) do
+        for _, child in pairs(tabContent:GetChildren()) do
+            if child:IsA("TextButton") and child.Text == "Aimbot" then
+                local box = child:FindFirstChildOfClass("Frame")
+                if box then
+                    box.BackgroundColor3 = aimbotEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+                end
+            elseif child:IsA("TextButton") and child.Text == "Show Aimbot FOV" then
+                local box = child:FindFirstChildOfClass("Frame")
+                if box then
+                    box.BackgroundColor3 = showAimFOV and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+                end
+            elseif child:IsA("TextButton") and child.Text == "Ignore Team Check (Aimbot)" then
+                local box = child:FindFirstChildOfClass("Frame")
+                if box then
+                    box.BackgroundColor3 = aimbotIgnoreTeamCheck and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+                end
+            elseif child:IsA("TextButton") and child.Text == "ESP" then
+                local box = child:FindFirstChildOfClass("Frame")
+                if box then
+                    box.BackgroundColor3 = espEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+                end
+            elseif child:IsA("TextButton") and child.Text == "Box ESP" then
+                local box = child:FindFirstChildOfClass("Frame")
+                if box then
+                    box.BackgroundColor3 = boxESPEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+                end
+            elseif child:IsA("TextButton") and child.Text == "Name ESP" then
+                local box = child:FindFirstChildOfClass("Frame")
+                if box then
+                    box.BackgroundColor3 = nameESPEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+                end
+            elseif child:IsA("TextButton") and child.Text == "Line ESP" then
+                local box = child:FindFirstChildOfClass("Frame")
+                if box then
+                    box.BackgroundColor3 = lineESPEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+                end
+            elseif child:IsA("TextButton") and child.Text == "Distance ESP" then
+                local box = child:FindFirstChildOfClass("Frame")
+                if box then
+                    box.BackgroundColor3 = distanceESPEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+                end
+            elseif child:IsA("TextButton") and child.Text == "Infinite Ammo" then
+                local box = child:FindFirstChildOfClass("Frame")
+                if box then
+                    box.BackgroundColor3 = infiniteAmmoEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+                end
+            elseif child:IsA("TextButton") and child.Text == "No Recoil" then
+                local box = child:FindFirstChildOfClass("Frame")
+                if box then
+                    box.BackgroundColor3 = noRecoilEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+                end
+            elseif child:IsA("TextButton") and child.Text == "No Spread" then
+                local box = child:FindFirstChildOfClass("Frame")
+                if box then
+                    box.BackgroundColor3 = noSpreadEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+                end
+            elseif child:IsA("TextButton") and child.Text == "Make All Guns Automatic" then
+                local box = child:FindFirstChildOfClass("Frame")
+                if box then
+                    box.BackgroundColor3 = makeAllGunsAutomaticEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+                end
+            elseif child:IsA("TextButton") and child.Text == "Crazy Fast Fire" then
+                local box = child:FindFirstChildOfClass("Frame")
+                if box then
+                    box.BackgroundColor3 = crazyFastFireEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+                end
+            elseif child:IsA("TextButton") and child.Text == "No Equip Time" then
+                local box = child:FindFirstChildOfClass("Frame")
+                if box then
+                    box.BackgroundColor3 = noEquipTimeEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+                end
+            end
+        end
+    end
+end
+
+local function addToggleButton(tabName, text, callback)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, -20, 0, 40)
+    button.Text = text
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    button.Font = Enum.Font.GothamBold
+    button.TextSize = 14
+    button.BorderSizePixel = 0
+    button.AutoButtonColor = false
+
+    local box = Instance.new("Frame", button)
+    box.Size = UDim2.new(0, 30, 0, 30)
+    box.Position = UDim2.new(1, -40, 0.5, -15)
+    box.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    local boxCorner = Instance.new("UICorner", box)
+    boxCorner.CornerRadius = UDim.new(0, 5)
+
+    local isActive = false
+
+    button.MouseButton1Click:Connect(function()
+        isActive = not isActive
+        box.BackgroundColor3 = isActive and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+        callback(isActive)
+    end)
+
+    button.Parent = tabContents[tabName]
+end
+
+local function addSlider(tabName, text, min, max, default, increment, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, -20, 0, 60)
+    frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    frame.BorderSizePixel = 0
+
+    local label = Instance.new("TextLabel", frame)
+    label.Size = UDim2.new(1, -10, 0.5, 0)
+    label.Position = UDim2.new(0, 5, 0, 0)
+    label.Text = text .. ": " .. tostring(default)
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.BackgroundTransparency = 1
+    label.TextXAlignment = Enum.TextXAlignment.Left
+
+    local sliderFrame = Instance.new("Frame", frame)
+    sliderFrame.Size = UDim2.new(1, -10, 0.5, 0)
+    sliderFrame.Position = UDim2.new(0, 5, 0.5, 0)
+    sliderFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    sliderFrame.BorderSizePixel = 0
+
+    local sliderButton = Instance.new("TextButton", sliderFrame)
+    sliderButton.Size = UDim2.new(0, 20, 1, 0)
+    sliderButton.Position = UDim2.new((default - min) / (max - min), -10, 0, 0)
+    sliderButton.BackgroundColor3 = Color3.fromRGB(255, 165, 0)
+    sliderButton.BorderSizePixel = 0
+    sliderButton.Text = ""
+
+    local function updateSlider(input)
+        local delta = input.Position.X - sliderFrame.AbsolutePosition.X
+        local percentage = math.clamp(delta / sliderFrame.AbsoluteSize.X, 0, 1)
+        local value = math.floor((min + (max - min) * percentage) / increment + 0.5) * increment
+        sliderButton.Position = UDim2.new((value - min) / (max - min), -10, 0, 0)
+        label.Text = text .. ": " .. tostring(value)
+        callback(value)
+    end
+
+    sliderButton.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local moveConn, releaseConn
+            moveConn = sliderButton.InputChanged:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseMovement then
+                    updateSlider(input)
+                end
+            end)
+            releaseConn = UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    moveConn:Disconnect()
+                    releaseConn:Disconnect()
+                end
+            end)
+        end
+    end)
+
+    frame.Parent = tabContents[tabName]
+end
+
+local aimbotEnabled = false
+local espEnabled = false
+local espObjects = {}
+local triggerbotEnabled = false
+
+-- Aimbot variables
+local aimSmoothness = 1
+local aimFOV = 100
+local showAimFOV = false
+local aimFOVColor = Color3.fromRGB(255, 0, 0)
+local aimbotRadius = 325
+local aimbotTargetBone = "Head"
+local aimbotIgnoreTeamCheck = false
+
+-- ESP variables
+local boxESPEnabled = false
+local nameESPEnabled = false
+local lineESPEnabled = false
+local distanceESPEnabled = false
+local espColor = Color3.fromRGB(255, 255, 255)
+local ignoreTeamCheck = false
+local espRadius = 325
+
+local aimFOVCircle = Drawing.new("Circle")
+aimFOVCircle.Thickness = 1
+aimFOVCircle.NumSides = 30
+aimFOVCircle.Radius = aimFOV
+aimFOVCircle.Color = aimFOVColor
+aimFOVCircle.Visible = false
+
+local function updateAimFOVCircle()
+    aimFOVCircle.Radius = aimFOV
+    aimFOVCircle.Color = aimFOVColor
+    aimFOVCircle.Position = UserInputService:GetMouseLocation()
+    aimFOVCircle.Visible = showAimFOV
+end
+
+local function getClosestEnemyToCursor()
+    local closestPlayer
+    local shortestDistance = math.huge
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and (aimbotIgnoreTeamCheck or player.Team ~= LocalPlayer.Team) and player.Character then
+            local targetPart = player.Character:FindFirstChild(aimbotTargetBone)
+            if targetPart then
+                local pos = targetPart.Position
+                local screenPos, onScreen = Camera:WorldToViewportPoint(pos)
+                if onScreen then
+                    local mousePos = UserInputService:GetMouseLocation()
+                    local distance = (Vector2.new(mousePos.X, mousePos.Y) - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
+                    if distance < shortestDistance and distance <= aimFOV and distance <= aimbotRadius then
+                        shortestDistance = distance
+                        closestPlayer = player
+                    end
+                end
+            end
+        end
+    end
+
+    return closestPlayer
+end
+
+local function smoothAim(targetPos)
+    local currentCFrame = Camera.CFrame
+    local targetCFrame = CFrame.new(currentCFrame.Position, targetPos)
+    local lerpFactor = math.clamp(1 - (aimSmoothness / 10), 0.1, 1)
+    Camera.CFrame = currentCFrame:Lerp(targetCFrame, lerpFactor)
+end
+
+RunService.RenderStepped:Connect(function()
+    if aimbotEnabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+        local closestEnemy = getClosestEnemyToCursor()
+        if closestEnemy and closestEnemy.Character then
+            local targetPart = closestEnemy.Character:FindFirstChild(aimbotTargetBone)
+            if targetPart then
+                smoothAim(targetPart.Position)
+            end
+        end
+    end
+
+    updateAimFOVCircle()
+end)
+
+local function triggerbot()
+    local target
+    while triggerbotEnabled do
+        target = getClosestEnemyToCursor()
+        if target and target.Character and target.Character:FindFirstChild(aimbotTargetBone) then
+            LocalPlayer.Character:FindFirstChildOfClass("Tool"):Activate()
+        end
+        wait(0.05)
+    end
+end
+
+-- Adding buttons and sliders for Legit tab
+addToggleButton("Legit", "Aimbot", function(state)
+    aimbotEnabled = state
+end)
+
+addSlider("Legit", "Aim Smoothness", 1, 10, 1, 0.01, function(value)
+    aimSmoothness = value
+end)
+
+addSlider("Legit", "Aimbot FOV", 1, 500, 100, 1, function(value)
+    aimFOV = value
+end)
+
+addSlider("Legit", "Aimbot Radius", 1, 500, 325, 1, function(value)
+    aimbotRadius = value
+end)
+
+addToggleButton("Legit", "Show Aimbot FOV", function(state)
+    showAimFOV = state
+    aimFOVCircle.Visible = state
+end)
+
+addToggleButton("Legit", "Ignore Team Check (Aimbot)", function(state)
+    aimbotIgnoreTeamCheck = state
+end)
+
+addToggleButton("Legit", "Triggerbot", function(state)
+    triggerbotEnabled = state
+    if state then
+        triggerbot()
+    end
+end)
+
+-- Adding buttons and sliders for Visual tab
+addToggleButton("Visual", "ESP", function(state)
+    espEnabled = state
+end)
+
+addToggleButton("Visual", "Box ESP", function(state)
+    boxESPEnabled = state
+end)
+
+addToggleButton("Visual", "Name ESP", function(state)
+    nameESPEnabled = state
+end)
+
+addToggleButton("Visual", "Line ESP", function(state)
+    lineESPEnabled = state
+end)
+
+addToggleButton("Visual", "Distance ESP", function(state)
+    distanceESPEnabled = state
+end)
+
+addSlider("Visual", "ESP Radius", 1, 5000, 325, 1, function(value)
+    espRadius = value
+end)
+
+local infiniteAmmoEnabled = false
+
+local function infiniteAmmoLoop()
+    while infiniteAmmoEnabled do
+        game.Players.LocalPlayer.PlayerGui.GUI.Client.Variables.ammocount.Value = 999
+        wait(0.1)
+    end
+end
+
+addToggleButton("GunMods", "Infinite Ammo", function(state)
+    infiniteAmmoEnabled = state
+    if state then
+        spawn(infiniteAmmoLoop)
+    else
+        game.Players.LocalPlayer.PlayerGui.GUI.Client.Variables.ammocount.Value = 30 -- Default value or you can set to any other default value
+    end
+end)
+
+local noRecoilEnabled = false
+local originalRecoilValues = {}
+
+local function saveOriginalRecoilValues()
+    for _, item in pairs(game.ReplicatedStorage.Weapons:GetDescendants()) do
+        if item:IsA("NumberValue") and item.Name == "RecoilControl" then
+            originalRecoilValues[item] = item.Value
+        end
+    end
+end
+
+local function setRecoilControl(value)
+    for item, originalValue in pairs(originalRecoilValues) do
+        if item and item:IsA("NumberValue") then
+            item.Value = value or originalValue
+        end
+    end
+end
+
+local function noRecoilLoop()
+    while noRecoilEnabled do
+        setRecoilControl(0)
+        wait(0.1)
+    end
+end
+
+addToggleButton("GunMods", "No Recoil", function(state)
+    noRecoilEnabled = state
+    if state then
+        saveOriginalRecoilValues()
+        spawn(noRecoilLoop)
+    else
+        setRecoilControl(nil)
+    end
+end)
+
+local noSpreadEnabled = false
+local originalSpreadValues = {}
+local originalSpreadRecoveryValues = {}
+
+local function saveOriginalSpreadValues()
+    for _, item in pairs(game.ReplicatedStorage.Weapons:GetDescendants()) do
+        if item:IsA("IntValue") and item.Name == "Spread" then
+            originalSpreadValues[item] = item.Value
+        elseif item:IsA("NumberValue") and item.Name == "SpreadRecovery" then
+            originalSpreadRecoveryValues[item] = item.Value
+        end
+    end
+end
+
+local function setSpread(value)
+    for item, originalValue in pairs(originalSpreadValues) do
+        if item and item:IsA("IntValue") then
+            item.Value = value or originalValue
+        end
+    end
+    for item, originalValue in pairs(originalSpreadRecoveryValues) do
+        if item and item:IsA("NumberValue") then
+            item.Value = value or originalValue
+        end
+    end
+end
+
+local function noSpreadLoop()
+    while noSpreadEnabled do
+        setSpread(0)
+        wait(0.1)
+    end
+end
+
+addToggleButton("GunMods", "No Spread", function(state)
+    noSpreadEnabled = state
+    if state then
+        saveOriginalSpreadValues()
+        spawn(noSpreadLoop)
+    else
+        setSpread(nil)
+    end
+end)
+
+local makeAllGunsAutomaticEnabled = false
+local originalAutomaticValues = {}
+
+local function saveOriginalAutomaticValues()
+    for _, item in pairs(game.ReplicatedStorage.Weapons:GetDescendants()) do
+        if item:IsA("BoolValue") and item.Name == "Auto" then
+            originalAutomaticValues[item] = item.Value
+        end
+    end
+end
+
+local function setAutomatic(value)
+    for item, originalValue in pairs(originalAutomaticValues) do
+        if item and item:IsA("BoolValue") then
+            item.Value = value or originalValue
+        end
+    end
+end
+
+local function makeAllGunsAutomaticLoop()
+    while makeAllGunsAutomaticEnabled do
+        setAutomatic(true)
+        wait(0.1)
+    end
+end
+
+addToggleButton("GunMods", "Make All Guns Automatic", function(state)
+    makeAllGunsAutomaticEnabled = state
+    if state then
+        saveOriginalAutomaticValues()
+        spawn(makeAllGunsAutomaticLoop)
+    else
+        setAutomatic(nil)
+    end
+end)
+
+local crazyFastFireEnabled = false
+local originalFireRateValues = {}
+
+local function saveOriginalFireRateValues()
+    for _, item in pairs(game.ReplicatedStorage.Weapons:GetDescendants()) do
+        if item:IsA("NumberValue") and item.Name == "FireRate" then
+            originalFireRateValues[item] = item.Value
+        end
+    end
+end
+
+local function setFireRate(value)
+    for item, originalValue in pairs(originalFireRateValues) do
+        if item and item:IsA("NumberValue") then
+            item.Value = value or originalValue
+        end
+    end
+end
+
+local function crazyFastFireLoop()
+    while crazyFastFireEnabled do
+        setFireRate(0.05)
+        wait(0.1)
+    end
+end
+
+addToggleButton("GunMods", "Crazy Fast Fire", function(state)
+    crazyFastFireEnabled = state
+    if state then
+        saveOriginalFireRateValues()
+        spawn(crazyFastFireLoop)
+    else
+        setFireRate(nil)
+    end
+end)
+
+local noEquipTimeEnabled = false
+local originalEquipTimeValues = {}
+
+local function saveOriginalEquipTimeValues()
+    for _, item in pairs(game.ReplicatedStorage.Weapons:GetDescendants()) do
+        if item:IsA("NumberValue") and item.Name == "EquipTime" then
+            originalEquipTimeValues[item] = item.Value
+        end
+    end
+end
+
+local function setEquipTime(value)
+    for item, originalValue in pairs(originalEquipTimeValues) do
+        if item and item:IsA("NumberValue") then
+            item.Value = value or originalValue
+        end
+    end
+end
+
+local function noEquipTimeLoop()
+    while noEquipTimeEnabled do
+        setEquipTime(0.05)
+        wait(0.1)
+    end
+end
+
+addToggleButton("GunMods", "No Equip Time", function(state)
+    noEquipTimeEnabled = state
+    if state then
+        saveOriginalEquipTimeValues()
+        spawn(noEquipTimeLoop)
+    else
+        setEquipTime(nil)
+    end
+end)
+
+local function createESP(player)
+    local espBox = Drawing.new("Square")
+    espBox.Visible = false
+    espBox.Color = espColor
+    espBox.Thickness = 1
+    espBox.Filled = false
+    espObjects[player] = {box = espBox}
+
+    local nameTag = Drawing.new("Text")
+    nameTag.Visible = false
+    nameTag.Color = espColor
+    nameTag.Size = 16
+    nameTag.Center = true
+    nameTag.Outline = true
+    espObjects[player].nameTag = nameTag
+
+    local line = Drawing.new("Line")
+    line.Visible = false
+    line.Color = espColor
+    line.Thickness = 1
+    espObjects[player].line = line
+
+    local distanceTag = Drawing.new("Text")
+    distanceTag.Visible = false
+    distanceTag.Color = espColor
+    distanceTag.Size = 16
+    distanceTag.Center = true
+    distanceTag.Outline = true
+    espObjects[player].distanceTag = distanceTag
+end
+
+local function getBoundingBox(character)
+    local minX, minY, maxX, maxY = math.huge, math.huge, -math.huge, -math.huge
+    for _, part in pairs(character:GetChildren()) do
+        if part:IsA("BasePart") then
+            local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+            if onScreen then
+                minX = math.min(minX, pos.X)
+                minY = math.min(minY, pos.Y)
+                maxX = math.max(maxX, pos.X)
+                maxY = math.max(maxY, pos.Y)
+            end
+        end
+    end
+    return Vector2.new(minX, minY), Vector2.new(maxX, maxY)
+end
+
+local function updateESP()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
+            local espBox = espObjects[player].box
+            local nameTag = espObjects[player].nameTag
+            local line = espObjects[player].line
+            local distanceTag = espObjects[player].distanceTag
+            local character = player.Character
+            local minPos, maxPos = getBoundingBox(character)
+            local distance = (LocalPlayer.Character.HumanoidRootPart.Position - character.HumanoidRootPart.Position).Magnitude
+
+            if espEnabled and (ignoreTeamCheck or player.Team ~= LocalPlayer.Team) and (LocalPlayer:DistanceFromCharacter(character.PrimaryPart.Position) <= espRadius) then
+                if boxESPEnabled then
+                    espBox.Visible = true
+                    espBox.Size = maxPos - minPos
+                    espBox.Position = minPos
+                else
+                    espBox.Visible = false
+                end
+
+                if nameESPEnabled then
+                    nameTag.Visible = true
+                    nameTag.Text = player.Name
+                    nameTag.Position = Vector2.new((minPos.X + maxPos.X) / 2, minPos.Y - 20)
+                else
+                    nameTag.Visible = false
+                end
+
+                if lineESPEnabled then
+                    line.Visible = true
+                    line.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                    line.To = Vector2.new((minPos.X + maxPos.X) / 2, minPos.Y)
+                else
+                    line.Visible = false
+                end
+
+                if distanceESPEnabled then
+                    distanceTag.Visible = true
+                    distanceTag.Text = string.format("%.1f", distance) .. " studs"
+                    distanceTag.Position = Vector2.new((minPos.X + maxPos.X) / 2, minPos.Y - 40)
+                else
+                    distanceTag.Visible = false
+                end
+            else
+                espBox.Visible = false
+                nameTag.Visible = false
+                line.Visible = false
+                distanceTag.Visible = false
+            end
+        end
+    end
+end
+
+for _, player in pairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        createESP(player)
+        player.CharacterAdded:Connect(function()
+            wait(1)
+            updateESP()
+        end)
+    end
+end
+
+Players.PlayerAdded:Connect(function(player)
+    if player ~= LocalPlayer then
+        createESP(player)
+        player.CharacterAdded:Connect(function(character)
+            wait(1)
+            updateESP()
+        end)
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    if espObjects[player] then
+        espObjects[player].box:Remove()
+        espObjects[player].nameTag:Remove()
+        espObjects[player].line:Remove()
+        espObjects[player].distanceTag:Remove()
+        espObjects[player] = nil
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    updateESP()
+end)
+
+local function showMainFrame()
+    mainFrame.Position = currentPos
+    local showTween = TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 600, 0, 400), BackgroundTransparency = 0})
+    mainFrame.Visible = true
+    showTween:Play()
+end
+
+local function hideMainFrame()
+    local hideTween = TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Size = UDim2.new(0, 100, 0, 100), BackgroundTransparency = 1})
+    hideTween.Completed:Connect(function()
+        mainFrame.Visible = false
+    end)
+    hideTween:Play()
+end
+
+UserInputService.InputBegan:Connect(function(input)
+    if input.KeyCode == toggleKey then
+        if mainFrame.Visible then
+            hideMainFrame()
+        else
+            showMainFrame()
+        end
+    end
+end)
+
+local function explodeEffect(textLabel)
+    local explosionParts = {}
+
+    for i = 1, #textLabel.Text do
+        local part = Instance.new("TextLabel", screenGui)
+        part.Size = UDim2.new(0, 20, 0, 20)
+        part.Text = textLabel.Text:sub(i, i)
+        part.Font = Enum.Font.GothamBold
+        part.TextSize = 50
+        part.TextColor3 = Color3.fromRGB(255, 255, 255)
+        part.BackgroundTransparency = 1
+        part.Position = textLabel.Position + UDim2.new(0, math.random(-200, 200), 0, math.random(-200, 200))
+
+        local direction = Vector2.new(math.random(-1, 1), math.random(-1, 1)).Unit
+        local distance = math.random(100, 300)
+        local endPosition = part.Position + UDim2.new(0, direction.X * distance, 0, direction.Y * distance)
+
+        table.insert(explosionParts, {part = part, endPosition = endPosition})
+    end
+
+    local explosionTweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out)
+
+    for _, partInfo in pairs(explosionParts) do
+        local tween = TweenService:Create(partInfo.part, explosionTweenInfo, {Position = partInfo.endPosition})
+        tween:Play()
+        tween.Completed:Connect(function()
+            partInfo.part:Destroy()
+        end)
+    end
+
+    textLabel:Destroy()
+    showMainFrame()
+end
+
+local function animateTitle()
+    local textLabel = Instance.new("TextLabel", screenGui)
+    textLabel.Size = UDim2.new(0, 400, 0, 100)
+    textLabel.Position = UDim2.new(0.5, -200, 0.5, -50)
+    textLabel.BackgroundTransparency = 1
+    textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    textLabel.Font = Enum.Font.GothamBold
+    textLabel.TextSize = 50
+    textLabel.Text = ""
+
+    local title = "PROXOWARE BETA"
+    for i = 1, #title do
+        textLabel.Text = textLabel.Text .. title:sub(i, i)
+        wait(0.1)
+    end
+
+    wait(0.5)
+    explodeEffect(textLabel)
+end
+
+local licenseKeyFrame = Instance.new("Frame", screenGui)
+licenseKeyFrame.Size = UDim2.new(0, 300, 0, 150)
+licenseKeyFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
+licenseKeyFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+licenseKeyFrame.BorderSizePixel = 0
+licenseKeyFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+
+local licenseKeyCorner = Instance.new("UICorner", licenseKeyFrame)
+licenseKeyCorner.CornerRadius = UDim.new(0, 10)
+
+local licenseKeyTitle = Instance.new("TextLabel", licenseKeyFrame)
+licenseKeyTitle.Size = UDim2.new(1, 0, 0, 50)
+licenseKeyTitle.Position = UDim2.new(0, 0, 0, 0)
+licenseKeyTitle.Text = "Please Enter your license key:"
+licenseKeyTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+licenseKeyTitle.Font = Enum.Font.GothamBold
+licenseKeyTitle.TextSize = 14
+licenseKeyTitle.BackgroundTransparency = 1
+
+local licenseKeyBox = Instance.new("TextBox", licenseKeyFrame)
+licenseKeyBox.Size = UDim2.new(0, 280, 0, 30)
+licenseKeyBox.Position = UDim2.new(0.5, -140, 0.5, -15)
+licenseKeyBox.PlaceholderText = "Enter license key"
+licenseKeyBox.Text = ""
+licenseKeyBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+licenseKeyBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+licenseKeyBox.Font = Enum.Font.Gotham
+licenseKeyBox.TextSize = 14
+licenseKeyBox.BorderSizePixel = 0
+
+local enterButton = Instance.new("TextButton", licenseKeyFrame)
+enterButton.Size = UDim2.new(0, 100, 0, 30)
+enterButton.Position = UDim2.new(0.5, -50, 1, -40)
+enterButton.Text = "Enter"
+enterButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+enterButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+enterButton.Font = Enum.Font.GothamBold
+enterButton.TextSize = 14
+enterButton.BorderSizePixel = 0
+
+local invalidText = Instance.new("TextLabel", licenseKeyFrame)
+invalidText.Size = UDim2.new(1, 0, 0, 20)
+invalidText.Position = UDim2.new(0, 0, 1, -20)
+invalidText.Text = ""
+invalidText.TextColor3 = Color3.fromRGB(255, 0, 0)
+invalidText.Font = Enum.Font.GothamBold
+invalidText.TextSize = 14
+invalidText.BackgroundTransparency = 1
+invalidText.Visible = false
+
+local validKeys = {
+    ["CopesKeyILoveCP"] = {timeLeft = 72 * 60 * 60, usesLeft = 3},
+    ["TestKey123"] = {timeLeft = 96 * 60 * 60, usesLeft = 10}
+}
+
+local function saveKeyData(key, data)
+    writefile("Proxoware_Key_" .. key .. ".json", HttpService:JSONEncode(data))
+end
+
+local function loadKeyData(key)
+    local fileName = "Proxoware_Key_" .. key .. ".json"
+    if isfile(fileName) then
+        return HttpService:JSONDecode(readfile(fileName))
+    else
+        return nil
+    end
+end
+
+local function checkLicenseKey(key)
+    local data = loadKeyData(key)
+    if data then
+        if data.usesLeft <= 0 then
+            return false, 0, "Key expired!"
+        end
+        data.usesLeft = data.usesLeft - 1
+        saveKeyData(key, data)
+        return true, data.timeLeft, data.usesLeft, ""
+    elseif validKeys[key] then
+        validKeys[key].usesLeft = validKeys[key].usesLeft - 1
+        saveKeyData(key, validKeys[key])
+        return true, validKeys[key].timeLeft, validKeys[key].usesLeft, ""
+    else
+        return false, 0, 0, "Key Invalid!"
+    end
+end
+
+local function updateLicenseKeyTime(timeLeft)
+    local days = math.floor(timeLeft / (24 * 60 * 60))
+    local hours = math.floor((timeLeft % (24 * 60 * 60)) / (60 * 60))
+    local minutes = math.floor((timeLeft % (60 * 60)) / 60)
+    local timeText = string.format("%d days, %d hours, %d minutes", days, hours, minutes)
+    return timeText
+end
+
+enterButton.MouseButton1Click:Connect(function()
+    local key = licenseKeyBox.Text
+    local isValid, timeLeft, usesLeft, message = checkLicenseKey(key)
+    if isValid then
+        animateTitle()
+        licenseKeyFrame.Visible = false
+
+        local timeLeftText = Instance.new("TextLabel", settingsContent)
+        timeLeftText.Size = UDim2.new(1, -20, 0, 30)
+        timeLeftText.Position = UDim2.new(0, 10, 0, 250)
+        timeLeftText.Text = "Time left: " .. updateLicenseKeyTime(timeLeft) .. ", Uses left: " .. usesLeft
+        timeLeftText.TextColor3 = Color3.fromRGB(255, 255, 255)
+        timeLeftText.Font = Enum.Font.Gotham
+        timeLeftText.TextSize = 14
+        timeLeftText.BackgroundTransparency = 1
+        timeLeftText.TextXAlignment = Enum.TextXAlignment.Left
+        saveKeyData("last_key", {key = key, timeLeft = timeLeft, usesLeft = usesLeft})
+    else
+        invalidText.Text = message
+        invalidText.Visible = true
+        wait(3)
+        invalidText.Visible = false
+    end
+end)
+
+local function showLicenseKeyPrompt()
+    local lastKeyData = loadKeyData("last_key")
+    if lastKeyData and lastKeyData.usesLeft > 0 then
+        animateTitle()
+        licenseKeyFrame.Visible = false
+
+        local timeLeftText = Instance.new("TextLabel", settingsContent)
+        timeLeftText.Size = UDim2.new(1, -20, 0, 30)
+        timeLeftText.Position = UDim2.new(0, 10, 0, 250)
+        timeLeftText.Text = "Time left: " .. updateLicenseKeyTime(lastKeyData.timeLeft) .. ", Uses left: " .. lastKeyData.usesLeft
+        timeLeftText.TextColor3 = Color3.fromRGB(255, 255, 255)
+        timeLeftText.Font = Enum.Font.Gotham
+        timeLeftText.TextSize = 14
+        timeLeftText.BackgroundTransparency = 1
+        timeLeftText.TextXAlignment = Enum.TextXAlignment.Left
+    else
+        licenseKeyFrame.Visible = true
+    end
+end
+
+showLicenseKeyPrompt()
