@@ -125,7 +125,7 @@ contentFrame.Position = UDim2.new(0, 150, 0, 0)
 contentFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 contentFrame.BorderSizePixel = 0
 
-local tabs = {"Legit", "Visual", "GunMods", "PlayerMods", "Settings", "Configuration"}
+local tabs = {"Legit", "Visual", "GunMods", "Settings", "Configuration"}
 local tabButtons = {}
 local tabContents = {}
 
@@ -1134,73 +1134,6 @@ end
 
 showLicenseKeyPrompt()
 
-
-local flyEnabled = false
-local flySpeed = 50
-local flyKey = Enum.KeyCode.E
-
-local function fly(isActive)
-    flyEnabled = isActive
-    local character = LocalPlayer.Character
-    if character and character:FindFirstChild("HumanoidRootPart") then
-        local rootPart = character.HumanoidRootPart
-        if isActive then
-            rootPart.Anchored = true
-            while flyEnabled do
-                if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-                    rootPart.CFrame = rootPart.CFrame + (rootPart.CFrame.lookVector * flySpeed * RunService.RenderStepped:Wait())
-                end
-                if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-                    rootPart.CFrame = rootPart.CFrame - (rootPart.CFrame.lookVector * flySpeed * RunService.RenderStepped:Wait())
-                end
-                if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-                    rootPart.CFrame = rootPart.CFrame * CFrame.new(-flySpeed * RunService.RenderStepped:Wait(), 0, 0)
-                end
-                if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-                    rootPart.CFrame = rootPart.CFrame * CFrame.new(flySpeed * RunService.RenderStepped:Wait(), 0, 0)
-                end
-                wait()
-            end
-        else
-            rootPart.Anchored = false
-        end
-    end
-end
-
-UserInputService.InputBegan:Connect(function(input)
-    if input.KeyCode == flyKey then
-        fly(not flyEnabled)
-    end
-end)
-
-addToggleButton("PlayerMods", "Fly", function(state)
-    fly(state)
-end)
-
-addSlider("PlayerMods", "Fly Speed", 1, 100, flySpeed, 1, function(value)
-    flySpeed = value
-end)
-
-
-local spinbotEnabled = false
-local spinSpeed = 500
-
-local function spinbot(isActive)
-    spinbotEnabled = isActive
-    while spinbotEnabled do
-        LocalPlayer.Character.HumanoidRootPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(spinSpeed * RunService.RenderStepped:Wait()), 0)
-        wait()
-    end
-end
-
-addToggleButton("PlayerMods", "Spinbot", function(state)
-    spinbot(state)
-end)
-
-addSlider("PlayerMods", "Spin Speed", 100, 1000, spinSpeed, 10, function(value)
-    spinSpeed = value
-end)
-
 -- Configuration Save/Load
 
 local saveConfigButton = Instance.new("TextButton", tabContents["Configuration"])
@@ -1255,11 +1188,7 @@ local function saveConfig()
             noSpreadEnabled = noSpreadEnabled,
             makeAllGunsAutomaticEnabled = makeAllGunsAutomaticEnabled,
             crazyFastFireEnabled = crazyFastFireEnabled,
-            noEquipTimeEnabled = noEquipTimeEnabled,
-            flyEnabled = flyEnabled,
-            flySpeed = flySpeed,
-            spinbotEnabled = spinbotEnabled,
-            spinSpeed = spinSpeed
+            noEquipTimeEnabled = noEquipTimeEnabled
         }
         writefile(configName .. "_Proxoware_Config.json", HttpService:JSONEncode(config))
     end
@@ -1287,10 +1216,6 @@ local function loadConfig()
         makeAllGunsAutomaticEnabled = config.makeAllGunsAutomaticEnabled
         crazyFastFireEnabled = config.crazyFastFireEnabled
         noEquipTimeEnabled = config.noEquipTimeEnabled
-        flyEnabled = config.flyEnabled
-        flySpeed = config.flySpeed
-        spinbotEnabled = config.spinbotEnabled
-        spinSpeed = config.spinSpeed
         updateAllUI()
     end
 end
