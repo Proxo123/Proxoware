@@ -569,13 +569,11 @@ end
 
 local function isVisible(targetPart)
     local origin = Camera.CFrame.Position
-    local direction = (targetPart.Position - origin).Unit * 1000
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, targetPart.Parent} -- Ignore the local player and the target itself
-    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-
-    local result = workspace:Raycast(origin, direction, raycastParams)
-    return result == nil -- True if there's no obstruction
+    local direction = (targetPart.Position - origin).Unit * (targetPart.Position - origin).Magnitude
+    local ray = Ray.new(origin, direction)
+    local hit, position = workspace:FindPartOnRayWithIgnoreList(ray, {LocalPlayer.Character, targetPart.Parent})
+    
+    return hit == nil or hit:IsDescendantOf(targetPart.Parent)
 end
 
 local function getClosestEnemyToCursor()
@@ -1405,7 +1403,7 @@ local function loadConfig()
         crazyFastFireEnabled = config.crazyFastFireEnabled
         noEquipTimeEnabled = config.noEquipTimeEnabled
         skeletonESPEnabled = config.skeletonESPEnabled
-        espIgnoreTeamCheck = config.espIgnoreTeamCheck, -- Added variable
+        espIgnoreTeamCheck = config.espIgnoreTeamCheck -- Added variable
         wallCheckEnabled = config.wallCheckEnabled -- Added variable
 
         updateAllUI()
