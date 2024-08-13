@@ -543,6 +543,7 @@ local aimFOVColor = Color3.fromRGB(255, 0, 0)
 local aimbotRadius = 325
 local aimbotTargetBone = "Head"
 local aimbotIgnoreTeamCheck = false
+local wallCheckEnabled = false  -- Added variable
 
 -- ESP variables
 local boxESPEnabled = false
@@ -566,6 +567,17 @@ local function updateAimFOVCircle()
     aimFOVCircle.Visible = showAimFOV
 end
 
+local function isVisible(targetPart)
+    local origin = Camera.CFrame.Position
+    local direction = (targetPart.Position - origin).Unit * 1000
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, targetPart.Parent} -- Ignore the local player and the target itself
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+
+    local result = workspace:Raycast(origin, direction, raycastParams)
+    return result == nil -- True if there's no obstruction
+end
+
 local function getClosestEnemyToCursor()
     local closestPlayer
     local shortestDistance = math.huge
@@ -576,7 +588,7 @@ local function getClosestEnemyToCursor()
             if targetPart then
                 local pos = targetPart.Position
                 local screenPos, onScreen = Camera:WorldToViewportPoint(pos)
-                if onScreen then
+                if onScreen and (not wallCheckEnabled or isVisible(targetPart)) then
                     local mousePos = UserInputService:GetMouseLocation()
                     local distance = (Vector2.new(mousePos.X, mousePos.Y) - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
                     if distance < shortestDistance and distance <= aimFOV and distance <= aimbotRadius then
@@ -636,6 +648,10 @@ end)
 
 addToggleButton("Legit", "Ignore Team Check (Aimbot)", function(state)
     aimbotIgnoreTeamCheck = state
+end)
+
+addToggleButton("Legit", "Wall Check", function(state)  -- New Wall Check Toggle
+    wallCheckEnabled = state
 end)
 
 -- Adding buttons and sliders for Visual tab
@@ -1358,7 +1374,8 @@ local function saveConfig()
             crazyFastFireEnabled = crazyFastFireEnabled,
             noEquipTimeEnabled = noEquipTimeEnabled,
             skeletonESPEnabled = skeletonESPEnabled,
-            espIgnoreTeamCheck = espIgnoreTeamCheck -- Added variable
+            espIgnoreTeamCheck = espIgnoreTeamCheck, -- Added variable
+            wallCheckEnabled = wallCheckEnabled -- Added variable
         }
         writefile(configName .. "_Proxoware_Config.json", HttpService:JSONEncode(config))
     end
@@ -1388,7 +1405,8 @@ local function loadConfig()
         crazyFastFireEnabled = config.crazyFastFireEnabled
         noEquipTimeEnabled = config.noEquipTimeEnabled
         skeletonESPEnabled = config.skeletonESPEnabled
-        espIgnoreTeamCheck = config.espIgnoreTeamCheck -- Added variable
+        espIgnoreTeamCheck = config.espIgnoreTeamCheck, -- Added variable
+        wallCheckEnabled = config.wallCheckEnabled -- Added variable
 
         updateAllUI()
         updateESPColor(espColor)
@@ -1425,7 +1443,6 @@ dummy.Head.Color = espColor
 
 local function updateESPPreview()
     dummy.Head.Color = espColor
-    -- Update the preview for other parts as needed
 end
 
 updateESPColor(espColor)
